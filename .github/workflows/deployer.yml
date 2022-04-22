@@ -1,0 +1,25 @@
+name: Deployment
+
+# on commit push, run job
+on: [push]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Cloud Functions Deploy
+      uses: google-github-actions/deploy-cloud-functions@v0.9.0
+      with:
+        credentials: ${{ secrets.GCP_SA_KEY }}
+        name: strava-calendar-tool
+        description: Strava Calendar Tool
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        region: europe-west1
+        source_dir: src
+        entry_point: start
+        runtime: python38
+        timeout: 10
+        max_instances: 3
