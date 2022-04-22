@@ -16,7 +16,7 @@ jobs:
         credentials_json: '${{ secrets.gcp_credentials }}'
 
     - name: 'Decrypt Secrets'
-      run: ./.github/scripts/decrypt_secret.sh
+      run: sh ./.github/scripts/decrypt_secret.sh
       env:
         SECRET_PASSPHRASE: ${{ secrets.SECRET_PASSPHRASE }}
 
