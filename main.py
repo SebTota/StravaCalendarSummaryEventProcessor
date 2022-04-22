@@ -2,7 +2,7 @@ import functions_framework
 from flask import Flask
 from user import User
 from strava import Strava
-from config import STRAVA_WEBHOOK, STRAVA_USER_TOKEN
+from config import STRAVA_WEBHOOK
 import db
 
 # NOT SENSITIVE
