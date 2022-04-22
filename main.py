@@ -1,31 +1,63 @@
-from tinydb import TinyDB, Query
+import functions_framework
 from flask import Flask
-import datetime
-
-from strava_auth_user import StravaAuthUser
+from user import User
 from strava import Strava
+from config import STRAVA_WEBHOOK, STRAVA_USER_TOKEN
+import db
 
-USER = 'sebtota'
+# NOT SENSITIVE
+USER_ID = 7008891832
 
-db = TinyDB('db.json')
-user_table = db.table('stravaUserAuth')
+def get_webhook(request):
+    print("GET /webhook")
+    data = request.args
+
+    if 'hub.mode' in data and 'hub.verify_token' in data:
+        if data['hub.mode'] == 'subscribe' and data['hub.verify_token'] == STRAVA_WEBHOOK['VERIFY_TOKEN']:
+            print('WEBHOOK_VERIFIED')
+            return {'hub.challenge': data['hub.challenge']}, 200
+        else:
+            return '', 403
 
 
-def save_user_strava_auth(user_auth: StravaAuthUser) -> None:
-    user_table.insert(user_auth.__dict__)
+def post_webhook(request):
+    print("POST /webhook")
+    data = request.args
+
+    # On new activity creation
+    if 'object_type' in data and 'aspect_type' in data \
+        and data['object_type'] == 'activity':
+        # and data['aspect_type'] == 'create'
+
+        user_id = data['owner_id']
+        activity_id = data['object_id']
+
+        print('Received a new activity: {} event for user: {}'.format(activity_id, user_id))
+
+    return 'EVENT_RECEIVED'
 
 
-def get_user_strava_auth(username: str) -> StravaAuthUser:
-    q = Query()
-    return StravaAuthUser(**(user_table.search(q.username == username))[0])
+def test(request):
+    print("/test")
+
+    user = db.get_user(USER_ID)
+    return {'test_user': user.user_id}
 
 
-if __name__ == '__main__':
-    print('Running Strava Private Run')
-    user = get_user_strava_auth(USER)
-    api = Strava(strava_auth_user=user)
-    print(api.get_activity(7008891832))
-    # activities = api.get_activities(after=datetime.datetime(2022, 4, 18))
-    # for activity in activities:
-    #     print(api.get_activity(activity.id).)
-    #     print(activity.id)
+
+@functions_framework.http
+def start(request):
+
+    print("Path: " + request.path)
+    print("Method: " + request.method)
+
+    if request.path == '/test':
+        return test(request)
+
+    if request.path == '/webhook':
+        if request.method == 'GET':
+            return get_webhook(request)
+        if request.method == 'POST':
+            return post_webhook(request)
+
+    return "Did not find endpoint"
