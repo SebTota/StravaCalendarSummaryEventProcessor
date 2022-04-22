@@ -15,6 +15,11 @@ jobs:
       with:
         credentials_json: '${{ secrets.gcp_credentials }}'
 
+    - name: 'Decrypt Secrets'
+      run: ./.github/scripts/decrypt_secret.sh
+      env:
+        SECRET_PASSPHRASE: ${{ secrets.SECRET_PASSPHRASE }}
+
     - id: 'deploy'
       uses: 'google-github-actions/deploy-cloud-functions@v0'
       with:
