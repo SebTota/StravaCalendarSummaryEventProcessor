@@ -23,11 +23,12 @@ def get_webhook(request):
 def post_webhook(request):
     print("POST /webhook")
     data = request.args
+    print(data)
+    print(data['object_type'])
 
     # On new activity creation
-    if 'object_type' in data and 'aspect_type' in data \
-        and data['object_type'] == 'activity':
-        # and data['aspect_type'] == 'create'
+    if 'object_type' in data and data['object_type'] == 'activity':
+        # and 'aspect_type' in data and data['aspect_type'] == 'create'
 
         user_id = data['owner_id']
         activity_id = data['object_id']
