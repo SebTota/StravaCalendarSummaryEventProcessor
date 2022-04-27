@@ -23,8 +23,10 @@ jobs:
     - id: 'deploy'
       uses: 'google-github-actions/deploy-cloud-functions@v0'
       with:
-        name: strava-calendar-tool
+        name: strava-calendar-summary
         runtime: python38
         entry_point: start
         timeout: 10
         max_instances: 3
+        event_trigger_type: providers/cloud.pubsub/eventTypes/topic.publish
+        event_trigger_resource: projects/$PROJECT_ID/topics/StravaCalendarSummaryStravaWebhookEvents 
