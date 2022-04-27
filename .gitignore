@@ -4,3 +4,4 @@ strava-*
 
 config.py
 db.json
+secrets.sh

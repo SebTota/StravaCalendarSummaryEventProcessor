@@ -2,6 +2,8 @@
     
 # Decrypt the file
 mkdir $GITHUB_WORKSPACE/secrets
-# --batch to prevent interactive command --yes to assume "yes" for questions
+
 gpg --quiet --batch --yes --decrypt --passphrase="$SECRET_PASSPHRASE" \
---output $GITHUB_WORKSPACE/config.py config.py.gpg
+--output .github/scripts/secrets.sh .github/scripts/secrets.sh.gpg
+
+. ./.github/scripts/secrets.sh
