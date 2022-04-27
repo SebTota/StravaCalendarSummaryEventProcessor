@@ -17,7 +17,8 @@ def start(event, context):
     try:
         strava_event: StravaEvent = StravaEvent.from_dict(body)
     except Exception as e:
-        logging.error('Failed creating Strava Event from cloud function data. Error: ' + e)
+        logging.error('Failed creating Strava Event from cloud function data.')
+        logging.exception(e)
 
     logging.info('Event processing function starting to process \
         event: {} for user: {}'.format(strava_event.object_id, strava_event.athlete_id))
@@ -26,7 +27,8 @@ def start(event, context):
         user: User = UserController().get_by_id(strava_event.athlete_id)
     except Exception as e:
         logging.error('Failed getting a user for \
-            event: {} for user: {}. Error: {}'.format(strava_event.id, strava_event.athlete_id, e))
+            event: {} for user: {}.'.format(strava_event.id, strava_event.athlete_id))
+        logging.exception(e)
     
     strava_util: StravaUtil = StravaUtil(user)
     activity = strava_util.get_activity(strava_event.id)
