@@ -12,3 +12,5 @@ def start(event, context):
         logging.info(body)
     else:
         logging.error('Could not find data for function: {}'.format(context.event_id))
+
+# pubsub_message = base64.b64decode(event['data']).decode('utf-8')

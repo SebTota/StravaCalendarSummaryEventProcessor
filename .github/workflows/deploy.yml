@@ -3,6 +3,9 @@ name: Deployment
 # on commit push, run job
 on: [push]
 
+env:
+  PROJECT_ID: ${{ secrets.GCE_PROJECT }}
+
 jobs:
   run:
     runs-on: ubuntu-latest
