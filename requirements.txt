@@ -25,6 +25,6 @@ pyparsing==3.0.8
 requests==2.27.1
 rsa==4.8
 six==1.16.0
-strava-calendar-summary-data-access-layer==0.0.17
--e git+https://github.com/SebTota/StravaCalendarSummaryUtils.git@36d0d3a6adc2a4143e91534fba47f3cd903d8df4#egg=strava_calendar_summary_utils
+-e git+https://github.com/SebTota/StravaCalendarSummaryDataAccessLayer.git#egg=strava_calendar_summary_data_access_layer
+-e git+https://github.com/SebTota/StravaCalendarSummaryUtils.git#egg=strava_calendar_summary_utils
 urllib3==1.26.9
