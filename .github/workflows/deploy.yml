@@ -32,4 +32,4 @@ jobs:
         timeout: 10
         max_instances: 3
         event_trigger_type: providers/cloud.pubsub/eventTypes/topic.publish
-        event_trigger_resource: projects/$PROJECT_ID/topics/StravaCalendarSummaryStravaWebhookEvents 
+        event_trigger_resource: projects/${{ secrets.GCE_PROJECT }}/topics/StravaCalendarSummaryStravaWebhookEvents 
