@@ -46,11 +46,11 @@ def start(event, context):
 
     if strava_event.object_type != 'activity': return  # Ignore all non 'activity' events other than de-auth events
 
-    if strava_event.event_type == StravaEventType.UPDATE:
+    if strava_event.event_type == StravaEventType.UPDATE.value:
         update_activity_event(strava_event, user)
-    elif strava_event.event_type == StravaEventType.CREATE:
+    elif strava_event.event_type == StravaEventType.CREATE.value:
         new_activity_event(strava_event, user)
-    elif strava_event.event_type == StravaEventType.DELETE:
+    elif strava_event.event_type == StravaEventType.DELETE.value:
         delete_activity_event(strava_event, user)
     else:
         logging.error('Received a request that the event processor doesnt know how to handle. Event type: {}'
