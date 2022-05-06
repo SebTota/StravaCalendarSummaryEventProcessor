@@ -14,7 +14,7 @@ def start(event, context):
     if 'data' in event:
         body = json.loads(base64.b64decode(event['data']).decode('utf-8'))
     else:
-        logging.exception(
+        logging.error(
             'Error launching event processing function. Could not find data for function: {}'.format(context.event_id))
         return
 
@@ -22,8 +22,7 @@ def start(event, context):
         strava_event: StravaEvent = StravaEvent.from_dict(body)
     except Exception as e:
         logging.error('Failed creating Strava Event from cloud function data.')
-        logging.exception(e)
-        return
+        raise e
 
     logging.info('Processing event: {} for user: {}'
                  .format(strava_event.event_time, strava_event.athlete_id))
@@ -34,8 +33,7 @@ def start(event, context):
     except Exception as e:
         logging.error('Failed getting a user for event: {} for user: {}.'
                       .format(strava_event.event_id, strava_event.athlete_id))
-        logging.exception(e)
-        return
+        raise e
 
     if strava_event.object_type == 'athlete' and strava_event.event_type == StravaEventType.UPDATE \
             and StravaEventUpdateType.AUTHORIZED in strava_event.updates and \
@@ -72,19 +70,15 @@ def new_activity_event(strava_event: StravaEvent, user: User):
     activity: Activity = strava_util.get_activity(strava_event.event_id)
     assert activity is not None
 
-    try:
+    if user.calendar_preferences and user.calendar_preferences.title_template != '':
         title_template = user.calendar_preferences.title_template
-        description_template = user.calendar_preferences.description_template
-    except:
-        logging.error(
-            'Failed to find title/description calendar event template for user: {}. Defaulting to base templates.'.format(
-                user.user_id))
+    else:
         title_template = DEFAULT_TITLE_TEMPLATE
-        description_template = DEFAULT_DESCRIPTION_TEMPLATE
 
-    print(str(activity.timezone))
-    print(str(activity.start_date_local).replace(' ', 'T'))
-    print(str((activity.start_date_local + activity.moving_time)).replace(' ', 'T'))
+    if user.calendar_preferences and user.calendar_preferences.description_template != '':
+        description_template = user.calendar_preferences.description_template
+    else:
+        description_template = DEFAULT_DESCRIPTION_TEMPLATE
 
     cal_event_id = g_cal.add_event(TemplateBuilder.fill_template(title_template, activity),
                                    TemplateBuilder.fill_template(description_template, activity),
@@ -97,14 +91,21 @@ def new_activity_event(strava_event: StravaEvent, user: User):
 
 
 def update_activity_event(strava_event: StravaEvent, user: User):
-    print('TODO')
+    # TODO: Make this more efficient. This should be as simple as modifying the new event function
+    #  to support insert and update API calls
+    delete_activity_event(strava_event, user)
+    new_activity_event(strava_event, user)
 
 
 def delete_activity_event(strava_event: StravaEvent, user: User):
-    print('TODO')
+    g_cal = GoogleCalendarUtil(user.calendar_credentials, user=user, calendar_id=user.calendar_id)
+    cal_event: CalendarEvent = CalendarEventController(user.user_id).get_by_id(str(strava_event.event_id))
+    if cal_event is None:
+        return  # Skip delete events for activities that were never processed
+    g_cal.delete_event(cal_event.calendar_event_id)
 
 
-if __name__ == '__main__':
-    user: User = UserController().get_by_id('10000566')
-    strava_event = StravaEvent('activity', 6998137422, StravaEventType.CREATE, {}, 10000566, 0)
-    new_activity_event(strava_event, user)
+# if __name__ == '__main__':
+#     user: User = UserController().get_by_id('10000566')
+#     strava_event = StravaEvent('activity', 6998137422, StravaEventType.CREATE, {}, 10000566, 0)
+#     new_activity_event(strava_event, user)

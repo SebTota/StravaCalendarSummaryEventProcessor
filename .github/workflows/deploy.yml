@@ -30,6 +30,8 @@ jobs:
         runtime: python38
         entry_point: start
         timeout: 10
+        memory_mb: 128MB
         max_instances: 3
         event_trigger_type: providers/cloud.pubsub/eventTypes/topic.publish
-        event_trigger_resource: projects/${{ secrets.GCE_PROJECT }}/topics/StravaCalendarSummaryStravaWebhookEvents 
+        event_trigger_resource: projects/${{ secrets.GCE_PROJECT }}/topics/StravaCalendarSummaryStravaWebhookEvents
+        env_vars_file: .github/scripts/secrets.yaml
