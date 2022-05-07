@@ -85,13 +85,27 @@ def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
     if update:
         # Update an existing calendar event and save the new calendar event id
         cal_event: CalendarEvent = cal_event_controller.get_by_id(str(strava_event.event_id))
-        cal_event_id = cal_util.update_event(cal_event.calendar_event_id,
-                                             TemplateBuilder.fill_template(title_template, activity),
-                                             TemplateBuilder.fill_template(description_template, activity),
-                                             str(activity.timezone),
-                                             str(activity.start_date_local).replace(' ', 'T'),
-                                             str((activity.start_date_local + activity.moving_time)).replace(' ', 'T'))
-    else:
+
+        if cal_event is None:
+            # Although this was an update event, this is an update for an event we have not yet processed. Treat
+            # this as a new activity event instead
+            logging.info('Received an update event on an activity we never processed. Treating activity: {} from '
+                         'user: {} as new activity event.'.format(strava_event.event_id, strava_event.athlete_id))
+            update = False
+        else:
+
+            # Use the templates that were used on the initial event creation
+            title_template = cal_event.title_template
+            description_template = cal_event.description_template
+
+            cal_util.update_event(cal_event.calendar_event_id,
+                                  TemplateBuilder.fill_template(title_template, activity),
+                                  TemplateBuilder.fill_template(description_template, activity),
+                                  str(activity.timezone),
+                                  str(activity.start_date_local).replace(' ', 'T'),
+                                  str((activity.start_date_local + activity.moving_time)).replace(' ', 'T'))
+
+    if not update:
         # Create a new calendar event for this strava event
         cal_event_id = cal_util.add_event(TemplateBuilder.fill_template(title_template, activity),
                                           TemplateBuilder.fill_template(description_template, activity),
