@@ -63,15 +63,18 @@ def app_deauthentication_event(strava_event: StravaEvent, user: User):
 
 def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
     strava_util: StravaUtil = StravaUtil(user.strava_credentials, user)
-    cal_util = GoogleCalendarUtil(user.calendar_credentials, user=user, calendar_id=user.calendar_id)
-    cal_event_controller = CalendarEventController(user.user_id)
-
     activity: Activity = strava_util.get_activity(strava_event.event_id)
     assert activity is not None
 
+    if user.calendar_preferences.per_run_summary_enabled:
+        process_new_activity_per_activity_event(activity, strava_event, user, update)
+
+
+def process_new_activity_per_activity_event(activity: Activity, strava_event: StravaEvent, user: User, update: bool):
     title_template = user.calendar_preferences.per_run_title_template
     description_template = user.calendar_preferences.per_run_description_template
 
+    cal_event_controller = CalendarEventController(user.user_id)
     if update:
         # Update an existing calendar event and save the new calendar event id
         cal_event: CalendarEvent = cal_event_controller.get_by_id(str(strava_event.event_id))
