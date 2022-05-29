@@ -1,4 +1,4 @@
-from strava_calendar_summary_utils import Logging, StravaUtil, GoogleCalendarUtil, TemplateBuilder
+from strava_calendar_summary_utils import Logging, StravaUtil, GoogleCalendarUtil, template_builder
 from strava_calendar_summary_data_access_layer import StravaEvent, User, UserController, \
     StravaEventType, StravaEventUpdateType, CalendarEventController, CalendarEvent
 
@@ -62,9 +62,6 @@ def app_deauthentication_event(strava_event: StravaEvent, user: User):
 
 
 def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
-    default_title_template = '{name}'
-    default_description_template = 'Strava activity: {type}. \nDistance: {distance_miles}\nDuration: {duration}'
-
     strava_util: StravaUtil = StravaUtil(user.strava_credentials, user)
     cal_util = GoogleCalendarUtil(user.calendar_credentials, user=user, calendar_id=user.calendar_id)
     cal_event_controller = CalendarEventController(user.user_id)
@@ -72,15 +69,8 @@ def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
     activity: Activity = strava_util.get_activity(strava_event.event_id)
     assert activity is not None
 
-    if user.calendar_preferences and user.calendar_preferences.title_template:
-        title_template = user.calendar_preferences.title_template
-    else:
-        title_template = default_title_template
-
-    if user.calendar_preferences and user.calendar_preferences.description_template:
-        description_template = user.calendar_preferences.description_template
-    else:
-        description_template = default_description_template
+    title_template = user.calendar_preferences.per_run_title_template
+    description_template = user.calendar_preferences.per_run_description_template
 
     if update:
         # Update an existing calendar event and save the new calendar event id
@@ -99,16 +89,16 @@ def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
             description_template = cal_event.description_template
 
             cal_util.update_event(cal_event.calendar_event_id,
-                                  TemplateBuilder.fill_template(title_template, activity),
-                                  TemplateBuilder.fill_template(description_template, activity),
+                                  template_builder.fill_template(title_template, activity),
+                                  template_builder.fill_template(description_template, activity),
                                   str(activity.timezone),
                                   str(activity.start_date_local).replace(' ', 'T'),
                                   str((activity.start_date_local + activity.moving_time)).replace(' ', 'T'))
 
     if not update:
         # Create a new calendar event for this strava event
-        cal_event_id = cal_util.add_event(TemplateBuilder.fill_template(title_template, activity),
-                                          TemplateBuilder.fill_template(description_template, activity),
+        cal_event_id = cal_util.add_event(template_builder.fill_template(title_template, activity),
+                                          template_builder.fill_template(description_template, activity),
                                           str(activity.timezone),
                                           str(activity.start_date_local).replace(' ', 'T'),
                                           str((activity.start_date_local + activity.moving_time)).replace(' ', 'T'))
