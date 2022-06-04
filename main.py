@@ -1,4 +1,6 @@
 import base64
+import datetime
+import pytz
 import json
 import logging
 
@@ -76,7 +78,9 @@ def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
     if update is False and user.calendar_preferences.daily_run_summary_enabled \
             or user.calendar_preferences.weekly_run_summary_enabled:
         summary_handler: SummaryHandler = SummaryHandler(user, str(activity.timezone))
-        summary_handler.update_summaries(activity.start_date_local)
+        start_date_local: datetime.datetime = activity.start_date_local
+        start_date_local = pytz.timezone(str(activity.timezone)).localize(start_date_local)
+        summary_handler.update_summaries(start_date_local)
 
 
 def process_new_activity_per_activity_event(activity: Activity, strava_event: StravaEvent, user: User, update: bool):

@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+import pytz
 from strava_calendar_summary_data_access_layer import User, EndOfWeekType, WeeklySummaryCalendarEventsController, \
     CalendarSummaryEvent, UserController
 from strava_calendar_summary_utils import StravaUtil, GoogleCalendarUtil, template_builder
@@ -17,7 +17,7 @@ def next_specified_day(date: datetime, day: EndOfWeekType) -> datetime:
     :param day: the weekday you are looking for
     :return: the datetime object of the next specified weekday
     """
-    days = (day.get_weekday_num_val() - date.weekday() + 7) % 7
+    days = ((day.get_weekday_num_val() - date.weekday() + 7) % 7) + 1
     return date + timedelta(days=days)
 
 
@@ -27,15 +27,13 @@ def get_day_start_and_end_datetime(date: datetime) -> [datetime, datetime]:
     :param date: the local date
     :return: [start_datetime_utc: datetime, end_datetime_utc: datetime]
     """
-    local_start_datetime: datetime = date
-
     # Find beginning and end of local date
-    local_start_datetime = local_start_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
-    local_end_datetime = local_start_datetime.replace(hour=23, minute=59, second=59, microsecond=999999)
+    local_start_datetime = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    local_end_datetime = local_start_datetime.replace(hour=23, minute=59, second=59, microsecond=0)
 
     # Find beginning and end of date in UTC
     activity_day_start_time = datetime.fromtimestamp(local_start_datetime.timestamp(), tz=timezone.utc)
-    activity_day_end_time = datetime.fromtimestamp(local_start_datetime.timestamp(), tz=timezone.utc)
+    activity_day_end_time = datetime.fromtimestamp(local_end_datetime.timestamp(), tz=timezone.utc)
 
     return [activity_day_start_time, activity_day_end_time]
 
@@ -48,7 +46,7 @@ def get_week_start_and_end_datetime(date: datetime, last_day_of_week: EndOfWeekT
     :return: [start_datetime_utc: datetime, end_datetime_utc: datetime]
     """
     start_day_datetime_utc, end_day_datetime_utc = get_day_start_and_end_datetime(date)
-    start_week_datetime_utc = next_specified_day(start_day_datetime_utc, last_day_of_week) - timedelta(days=7)
+    start_week_datetime_utc = next_specified_day(start_day_datetime_utc, last_day_of_week) - timedelta(days=6)
     end_week_datetime_utc = next_specified_day(end_day_datetime_utc, last_day_of_week)
 
     return [start_week_datetime_utc, end_week_datetime_utc]
@@ -172,7 +170,10 @@ class SummaryHandler:
         :param end: end time in UTC
         :return: a list of activities that fell between the specified dates
         """
-        return list(self.strava_util.get_activities(after=start, before=end))
+        l: [Activity] = list(self.strava_util.get_activities(after=start, before=end))
+        for a in l:
+            a.start_date_local = pytz.timezone(str(a.timezone)).localize(a.start_date_local)
+        return l
 
     def get_date_in_local_timezone(self, date: datetime) -> datetime:
         """
