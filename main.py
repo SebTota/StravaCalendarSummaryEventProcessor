@@ -1,11 +1,13 @@
-from strava_calendar_summary_utils import Logging, StravaUtil, GoogleCalendarUtil, template_builder
-from strava_calendar_summary_data_access_layer import StravaEvent, User, UserController, \
-    StravaEventType, StravaEventUpdateType, CalendarEventController, CalendarEvent
-
-import logging
 import base64
 import json
+import logging
+
+from strava_calendar_summary_data_access_layer import StravaEvent, User, UserController, \
+    StravaEventType, StravaEventUpdateType, CalendarEventController, CalendarEvent
+from strava_calendar_summary_utils import Logging, StravaUtil, GoogleCalendarUtil, template_builder
 from stravalib.model import Activity
+
+from src.utils.SummaryHandler import SummaryHandler
 
 
 def start(event, context):
@@ -34,6 +36,9 @@ def start(event, context):
         logging.error('Failed getting a user for event: {} for user: {}.'
                       .format(strava_event.event_id, strava_event.athlete_id))
         raise e
+
+    if user.calendar_credentials is None:
+        logging.info('User: {} hasnt finished setting up Google Calendar permissions. Skipping new strava event.'.format(user.user_id))
 
     if strava_event.object_type == 'athlete' and strava_event.event_type == StravaEventType.UPDATE \
             and StravaEventUpdateType.AUTHORIZED in strava_event.updates and \
@@ -68,6 +73,10 @@ def activity_event(strava_event: StravaEvent, user: User, update: bool = False):
 
     if user.calendar_preferences.per_run_summary_enabled:
         process_new_activity_per_activity_event(activity, strava_event, user, update)
+    if update is False and user.calendar_preferences.daily_run_summary_enabled \
+            or user.calendar_preferences.weekly_run_summary_enabled:
+        summary_handler: SummaryHandler = SummaryHandler(user, str(activity.timezone))
+        summary_handler.update_summaries(activity.start_date_local)
 
 
 def process_new_activity_per_activity_event(activity: Activity, strava_event: StravaEvent, user: User, update: bool):
@@ -105,7 +114,8 @@ def add_activity_event_to_calendar(user: User, title_template: str, description_
     cal_event_controller.insert(activity.id, cal_event)
 
 
-def update_activity_event_in_calendar(cal_event: CalendarEvent, user: User, title_template: str, description_template: str, activity: Activity):
+def update_activity_event_in_calendar(cal_event: CalendarEvent, user: User, title_template: str,
+                                      description_template: str, activity: Activity):
     cal_util = GoogleCalendarUtil(user.calendar_credentials, user=user, calendar_id=user.calendar_id)
 
     cal_util.update_event(cal_event.calendar_event_id,
