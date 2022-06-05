@@ -1,6 +1,6 @@
 import pytz
 from strava_calendar_summary_data_access_layer import User, EndOfWeekType, WeeklySummaryCalendarEventsController, \
-    CalendarSummaryEvent, UserController
+    CalendarSummaryEvent, UserController, DailySummaryCalendarEventsController
 from strava_calendar_summary_utils import StravaUtil, GoogleCalendarUtil, template_builder
 
 from datetime import datetime, timezone, timedelta
@@ -59,6 +59,8 @@ class SummaryHandler:
 
         self.user_controller: UserController = UserController()
         self.strava_util: StravaUtil = StravaUtil(self.user.strava_credentials, self.user)
+        self.daily_summary_events_controller: DailySummaryCalendarEventsController = \
+            DailySummaryCalendarEventsController(self.user.user_id)
         self.weekly_summary_events_controller: WeeklySummaryCalendarEventsController = \
             WeeklySummaryCalendarEventsController(self.user.user_id)
         self.calendar_util: GoogleCalendarUtil = GoogleCalendarUtil(user.calendar_credentials, user=user, calendar_id=user.calendar_id)
@@ -80,34 +82,54 @@ class SummaryHandler:
         week_start_utc, week_end_utc = get_week_start_and_end_datetime(date, self.user.calendar_preferences.end_of_week)
 
         if weekly_summary:
-            activities = self.get_activities(week_start_utc, week_end_utc)
+            activities = self._get_activities(week_start_utc, week_end_utc)
         else:
-            activities = self.get_activities(day_start_utc, day_end_utc)
+            activities = self._get_activities(day_start_utc, day_end_utc)
 
         if weekly_summary:
-            self.update_weekly_summary(activities, week_start_utc, week_end_utc)
-        # if daily_summary:
-        #     self.update_daily_summary(self.get_activities_between_date(activities, day_start_utc, day_end_utc))
+            self._update_weekly_summary(activities, week_start_utc, week_end_utc)
+        if daily_summary:
+            self._update_daily_summary(self._get_activities_between_date(activities, day_start_utc, day_end_utc), day_start_utc, day_end_utc)
 
-    def update_weekly_summary(self, activities: [Activity], start: datetime, end: datetime):
-        event_id: Union[None, str] = self.get_weekly_summary_event_id_for_date(end.date())
+    def _update_weekly_summary(self, activities: [Activity], start: datetime, end: datetime):
+        event_id: Union[None, str] = self._get_weekly_summary_event_id_for_date(end.date())
 
         title: str = template_builder.fill_summary_template(
             self.user.calendar_preferences.weekly_run_title_template, activities)
         description: str = template_builder.fill_summary_template(
             self.user.calendar_preferences.weekly_run_description_template, activities)
-        calendar_event_date: Date = self.get_date_in_local_timezone(end).date()
+        calendar_event_date: Date = self._get_date_in_local_timezone(end).date()
 
         if event_id is None:
             # Create a new weekly summary calendar event
-            event_id = self.add_summary_event_to_calendar(title, description, self.user_local_timezone, calendar_event_date)
+            event_id = self._add_summary_event_to_calendar(title, description, self.user_local_timezone, calendar_event_date)
         else:
             # Update the existing weekly summary calendar event
-            self.update_summary_event_to_calendar(event_id, title, description, self.user_local_timezone, calendar_event_date)
+            self._update_summary_event_to_calendar(event_id, title, description, self.user_local_timezone, calendar_event_date)
 
-        self.save_weekly_summary_event_id_for_date(event_id, start, end)
+        self._save_weekly_summary_event_id_for_date(event_id, start, end)
 
-    def get_weekly_summary_event_id_for_date(self, date: Date) -> Union[None, str]:
+    def _update_daily_summary(self, activities: [Activity], start: datetime, end: datetime):
+        event_id: Union[None, str] = self._get_daily_summary_event_id_for_date(end.date())
+
+        title: str = template_builder.fill_summary_template(
+            self.user.calendar_preferences.daily_run_title_template, activities)
+        description: str = template_builder.fill_summary_template(
+            self.user.calendar_preferences.daily_run_description_template, activities)
+        calendar_event_date: Date = self._get_date_in_local_timezone(end).date()
+
+        if event_id is None:
+            # Create a new daily summary calendar event
+            event_id = self._add_summary_event_to_calendar(title, description, self.user_local_timezone,
+                                                           calendar_event_date)
+        else:
+            # Update the existing daily summary calendar event
+            self._update_summary_event_to_calendar(event_id, title, description, self.user_local_timezone,
+                                                   calendar_event_date)
+
+        self._save_daily_summary_event_id_for_date(event_id, start, end)
+
+    def _get_weekly_summary_event_id_for_date(self, date: Date) -> Union[None, str]:
         """
         Get the calendar event id for a weekly summary calendar event
         :param date: the date indicating the end of the week
@@ -124,7 +146,7 @@ class SummaryHandler:
         else:
             return entry.calendar_event_id
 
-    def save_weekly_summary_event_id_for_date(self, event_id: str, start: datetime, end: datetime):
+    def _save_weekly_summary_event_id_for_date(self, event_id: str, start: datetime, end: datetime):
         """
         Save a weekly summary calendar event id so that the event can be updated at a later date if needed
         :param event_id: the calendar event id
@@ -140,7 +162,40 @@ class SummaryHandler:
 
         self.weekly_summary_events_controller.insert(str(end.date()), entry)
 
-    def add_summary_event_to_calendar(self, title: str, description: str, timezone: str, date: Date) -> str:
+    def _get_daily_summary_event_id_for_date(self, date: Date) -> Union[None, str]:
+        """
+        Get the calendar event id for a daily summary calendar event
+        :param date: the date indicating the end of the week
+        :return: None if there is no event id or a string of the event id if present
+        """
+
+        if self.user.daily_summary_calendar_event is not None and \
+                date == self.user.daily_summary_calendar_event.end_datetime.date():
+            return self.user.daily_summary_calendar_event.calendar_event_id
+
+        entry: CalendarSummaryEvent = self.daily_summary_events_controller.get_by_id(str(date))
+        if entry is None:
+            return None
+        else:
+            return entry.calendar_event_id
+
+    def _save_daily_summary_event_id_for_date(self, event_id: str, start: datetime, end: datetime):
+        """
+        Save a daily summary calendar event id so that the event can be updated at a later date if needed
+        :param event_id: the calendar event id
+        :param start: start of the day
+        :param end: end of the day
+        :return: None
+        """
+        entry: CalendarSummaryEvent = CalendarSummaryEvent(event_id, start, end)
+        if self.user.daily_summary_calendar_event is None or \
+                self.user.daily_summary_calendar_event.end_datetime.date() < end.date():
+            self.user.daily_summary_calendar_event = entry
+            self.user_controller.update(self.user.user_id, self.user)
+
+        self.daily_summary_events_controller.insert(str(end.date()), entry)
+
+    def _add_summary_event_to_calendar(self, title: str, description: str, timezone: str, date: Date) -> str:
         """
         Add a new summary calendar event
         :param title: the title of the event
@@ -151,7 +206,7 @@ class SummaryHandler:
         """
         return self.calendar_util.add_all_day_event(title, description, timezone, str(date).replace(' ', 'T'))
 
-    def update_summary_event_to_calendar(self, event_id: str, title: str, description: str, timezone: str, date: Date) -> str:
+    def _update_summary_event_to_calendar(self, event_id: str, title: str, description: str, timezone: str, date: Date) -> str:
         """
         Update a calendar summary event
         :param event_id: the calendar event id indicating which event to update
@@ -163,7 +218,7 @@ class SummaryHandler:
         """
         return self.calendar_util.update_all_day_event(event_id, title, description, timezone, str(date).replace(' ', 'T'))
 
-    def get_activities(self, start: datetime, end: datetime) -> [Activity]:
+    def _get_activities(self, start: datetime, end: datetime) -> [Activity]:
         """
         Get the users activities between the specified date
         :param start: start time in UTC
@@ -175,7 +230,7 @@ class SummaryHandler:
             a.start_date_local = pytz.timezone(str(a.timezone)).localize(a.start_date_local)
         return l
 
-    def get_date_in_local_timezone(self, date: datetime) -> datetime:
+    def _get_date_in_local_timezone(self, date: datetime) -> datetime:
         """
         Convert a date to the users local timezone
         :param date: date to convert timezone of
@@ -183,7 +238,7 @@ class SummaryHandler:
         """
         return datetime.fromtimestamp(date.timestamp(), tz=tz.gettz(self.user_local_timezone))
 
-    def get_activities_between_date(self, activities: [Activity], start: datetime, end: datetime) -> [Activity]:
+    def _get_activities_between_date(self, activities: [Activity], start: datetime, end: datetime) -> [Activity]:
         """
         Return a list of activities that fall between the start and end date
         :param activities: list of activities to check
